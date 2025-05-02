@@ -12,9 +12,10 @@ builder.Services.AddSwaggerGen();
 
 // Регистрация зависимостей
 builder.Services.AddScoped<IUsersService, UsersService>();
-builder.Services.AddScoped<ADatabaseConnection, SqliteConnection>();
+builder.Services.AddScoped<ADatabaseConnection, MssqlConnection>();
 
 builder.Services.AddAutoMapper(typeof(Program));
+builder.Services.AddScoped<ITokenService, TokenService>();
 
 var app = builder.Build();
 
@@ -24,7 +25,7 @@ app.UseCors(x => x
     .AllowCredentials()
     .SetIsOriginAllowed(origin => true));
 
-ADatabaseConnection connection = new SqliteConnection();
+ADatabaseConnection connection = new MssqlConnection();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -33,7 +34,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
