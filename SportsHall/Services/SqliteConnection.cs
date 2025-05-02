@@ -5,16 +5,16 @@ namespace SportsHall.Services
 {
     public class SqliteConnection : ADatabaseConnection
     {
-        private const string _DATABASE_NAME = "production.db";
+        private const string DATABASE_NAME = "production.db";
 
-        protected override string ReturnConnectionString()
+        protected override string GetConnectionString()
         {
-            return $"Data Source={_DATABASE_NAME}";
+            return $"Data Source={DATABASE_NAME}";
         }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlite(this.ConnectionString);
+            optionsBuilder.UseSqlite(ConnectionString);
         }
     }
 }

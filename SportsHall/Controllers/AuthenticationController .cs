@@ -7,6 +7,7 @@ using SportsHall.Models.Entities;
 using SportsHall.Models.Domains;
 using SportsHall.Services;
 using SportsHall.Services.Interfaces;
+using Microsoft.AspNetCore.Http;
 
 namespace SportsHall.Controllers
 {
@@ -16,12 +17,16 @@ namespace SportsHall.Controllers
     {
         private readonly IUsersService _usersService;
         private readonly IMapper _mapper;
+        private readonly ITokenService _token;
+        private readonly IWebHostEnvironment _env;
         private string _login = null!;
 
-        public AuthenticationController(IUsersService usersService, IMapper mapper)
+        public AuthenticationController(IUsersService usersService, IMapper mapper, ITokenService token, IWebHostEnvironment env)
         {
             _usersService = usersService;
             _mapper = mapper;
+            _token = token;
+            _env = env;
         }
 
         [HttpPost("register")]
@@ -61,48 +66,49 @@ namespace SportsHall.Controllers
 
 
 
-        //[HttpPost("login")]
-        //public async Task<IActionResult> Login([FromBody] UserLoginDto userDto)
-        //{
-        //    if (!ModelState.IsValid)
-        //    {
-        //        return BadRequest(ModelState);
-        //    }
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] UserLoginDto userDto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
-        //    try
-        //    {
-        //        // 1. Находим пользователя по логину.  Вместо GetUserByLoginAsync, используйте метод,
-        //        //    который возвращает объект пользователя, а не просто проверяет его существование.
-        //        var user = await _usersService.GetUserByLoginAsync(userDto.Login);
+            try
+            {
+                var user = await _usersService.GetUserByLoginAsync(userDto.Login, userDto.Password);
 
-        //        if (user == null)
-        //        {
-        //            return Unauthorized("Неверный логин или пароль."); // Или NotFound, в зависимости от ваших требований.
-        //        }
+                if (user == null)
+                {
+                    return Unauthorized(new { Message = "Неверный логин или пароль." });
+                }
 
-        //        // 2. Получаем соль из объекта пользователя, полученного из базы данных.
-        //        string salt = user.Salt;
+                //  Создаем токен
+                var token = _token.CreateToken(user);
 
-        //        // 3. Хешируем введенный пароль с использованием соли пользователя.
-        //        string hashedPassword = PasswordHelper.HashPassword(userDto.Password, salt);
+                var cookieOptions = new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = _env.IsProduction() && !_env.IsDevelopment(), // Secure для продакшена
+                    SameSite = SameSiteMode.Lax, // Менее строгий SameSite
+                    Expires = DateTimeOffset.UtcNow.AddMinutes(30)
+                };
 
-        //        // 4. Сравниваем захешированный введенный пароль с захешированным паролем из базы данных.
-        //        if (user.Password != hashedPassword)
-        //        {
-        //            return Unauthorized("Неверный логин или пароль.");
-        //        }
-
-        //        // 5. Если пароли совпадают, выполняем дальнейшие действия (например, создание токена аутентификации).
-        //        //   Предположим, что у вас есть метод для создания токена.
-        //       // var token = _tokenService.CreateToken(user); // Замените на вашу реализацию создания токена
-
-        //        return Ok(new { Token = token, Message = "Вход выполнен успешно." });
-
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.Error.WriteLine($"Ошибка при входе в кабинет пользователя: {ex}");
-        //        return StatusCode(500, "Произошла ошибка при входе.");
-        //    }
+                Response.Cookies.Append("authToken", token, cookieOptions);
+                return Ok(new { Username = user.Login, Message = "Вход выполнен успешно." });
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Ошибка при входе: {ex}");
+                if (_env.IsDevelopment())
+                {
+                    return StatusCode(500, $"Ошибка при входе: {ex.Message}\n{ex.StackTrace}"); // Подробности в dev
+                }
+                else
+                {
+                    return StatusCode(500, "Произошла ошибка при входе.");
+                }
+            }
+        }
     }
 }

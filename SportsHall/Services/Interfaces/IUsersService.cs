@@ -5,7 +5,8 @@ namespace SportsHall.Services.Interfaces
     public interface IUsersService
     {
         Task AddUserAsync(Users user);
-        Task<Users> GetUserByLoginAsync(string login);
+
+        Task<Users> GetUserByLoginAsync(string login, string password);
 
         Task<bool> IsEmailAddressUniqueAsync(string emailAddress);
     }
