@@ -8,8 +8,20 @@ namespace SportsHall.Services
     {
         private const string DATABASE_NAME = "messenger";
 
+       // private readonly IAppSettings _settings;
+
+        //public MssqlConnection(IAppSettings settings)
+        //{
+        //    _settings = settings;
+        //}
+
         protected override string GetConnectionString()
         {
+            //string server = _settings.DatabaseServerName;
+            //string port = _settings.DatabasePort;
+            //string user = _settings.UserName;
+            //string password = _settings.UserPassword;
+
             const string SERVER_VAR = "DATABASE_SERVER_NAME";
             const string PORT_VAR = "DATABASE_PORT";
             const string USER_VAR = "USER_NAME";
@@ -18,6 +30,7 @@ namespace SportsHall.Services
             var port = Environment.GetEnvironmentVariable(PORT_VAR) ?? "5000";
             var user = Environment.GetEnvironmentVariable(USER_VAR) ?? "sa";
             var password = Environment.GetEnvironmentVariable(PASS_VAR) ?? "fakePassw0rd";
+
 
             if (!string.IsNullOrEmpty(server) && !string.IsNullOrEmpty(port) &&
                 !string.IsNullOrEmpty(user) && !string.IsNullOrEmpty(password))
@@ -32,14 +45,6 @@ namespace SportsHall.Services
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             optionsBuilder.UseSqlServer(ConnectionString);
-        }
-
-        public MssqlConnection()
-        {
-            if (Debugger.IsAttached)
-            {
-                Console.WriteLine($"Подключение к MSSQL: {ConnectionString}");
-            }
         }
     }
 }

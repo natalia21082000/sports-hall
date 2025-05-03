@@ -19,7 +19,6 @@ namespace SportsHall.Controllers
         private readonly IMapper _mapper;
         private readonly ITokenService _token;
         private readonly IWebHostEnvironment _env;
-        private string _login = null!;
 
         public AuthenticationController(IUsersService usersService, IMapper mapper, ITokenService token, IWebHostEnvironment env)
         {
@@ -89,8 +88,8 @@ namespace SportsHall.Controllers
                 var cookieOptions = new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = _env.IsProduction() && !_env.IsDevelopment(), // Secure для продакшена
-                    SameSite = SameSiteMode.Lax, // Менее строгий SameSite
+                    Secure = _env.IsProduction() && !_env.IsDevelopment(),
+                    SameSite = SameSiteMode.Lax,
                     Expires = DateTimeOffset.UtcNow.AddMinutes(30)
                 };
 
