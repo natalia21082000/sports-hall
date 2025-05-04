@@ -9,30 +9,30 @@ namespace SportsHall.Services
 {
     public class TokenService: ITokenService
     {
-        private readonly string _secretKey; // Ваш секретный ключ.  Храните его БЕЗОПАСНО!
+        private readonly string _secretKey;
+        private readonly string _issuer;
+        private readonly string _audience;
+        private readonly int _tokenLifetimeMinutes;
 
-        public TokenService(IConfiguration configuration) // Получаем секретный ключ из конфигурации
+        public TokenService(IConfiguration configuration)
         {
-            _secretKey = configuration["Jwt:Key"]; //  Jwt:Key -  ключ в вашем appsettings.json
+            _secretKey = configuration["Jwt:Key"] ?? throw new ArgumentNullException("Jwt:Key", "JWT Secret Key is missing in configuration.");
+            _issuer = configuration["Jwt:Issuer"] ?? throw new ArgumentNullException("Jwt:Issuer", "JWT Issuer is missing in configuration.");
+            _audience = configuration["Jwt:Audience"] ?? throw new ArgumentNullException("Jwt:Audience", "JWT Audience is missing in configuration.");
+            _tokenLifetimeMinutes = configuration.GetValue<int>("Jwt:TokenLifetimeMinutes");
         }
 
-        public string CreateToken(Users user)
+        public string GenerateToken(IEnumerable<Claim> claims)
         {
-            var claims = new[]
-            {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), // ID пользователя
-            new Claim(ClaimTypes.Name, user.Login), // Логин пользователя
-            // Добавьте другие claims, например, роли:  new Claim(ClaimTypes.Role, "Admin")
-        };
-
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
+                issuer: _issuer,
+                audience: _audience,
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(30), // Время жизни токена (30 минут)
-                signingCredentials: creds
-            );
+                expires: DateTime.UtcNow.AddMinutes(_tokenLifetimeMinutes),
+                signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }

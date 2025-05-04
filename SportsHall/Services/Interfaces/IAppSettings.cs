@@ -17,5 +17,7 @@
         // Superuser
         string DbSuperUser { get; }
         string DbSuperUserPassword { get; }
+
+        string EnvironmentMode { get; }
     }
 }

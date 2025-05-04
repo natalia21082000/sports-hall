@@ -26,14 +26,11 @@ namespace SportsHall.Services
 
         public async Task<Users> GetUserByLoginAsync(string login, string password)
         {
-            // 1. Получаем соль для этого логина (если она есть)
             var user = await _connection.Users.FirstOrDefaultAsync(u => u.Login == login);
-            if (user == null) return null; // Логин не найден
+            if (user == null) return null;
 
-            // 2. Хэшируем введенный пароль с использованием соли
             string hashedPassword = PasswordHelper.HashPassword(password, user.Salt);
 
-            // 3. Ищем пользователя, у которого логин и пароль совпадают
             return await _connection.Users.FirstOrDefaultAsync(u => u.Login == login && u.Password == hashedPassword);
         }
     }

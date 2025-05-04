@@ -71,7 +71,7 @@ namespace SportsHall.Infrastructure.Settings
             get
             {
                 var value = Environment.GetEnvironmentVariable("USER_PASSWORD") ?? "fakePassw0rd";
-                Console.WriteLine($"USER_PASSWORD: {value}"); // ОСТОРОЖНО: Не выводите пароли в продакшене
+                Console.WriteLine($"USER_PASSWORD: {value}");
                 return value;
             }
         }
@@ -102,7 +102,17 @@ namespace SportsHall.Infrastructure.Settings
             get
             {
                 var value = Environment.GetEnvironmentVariable("DB_SUPERUSER_PASSWORD") ?? "StrongAdminPassw0rd!";
-                Console.WriteLine($"DB_SUPERUSER_PASSWORD: {value}"); // ОСТОРОЖНО: Не выводите пароли в продакшене
+                Console.WriteLine($"DB_SUPERUSER_PASSWORD: {value}");
+                return value;
+            }
+        }
+
+        public string EnvironmentMode
+        {
+            get
+            {
+                var value = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+                Console.WriteLine($"ASPNETCORE_ENVIRONMENT: {value}");
                 return value;
             }
         }

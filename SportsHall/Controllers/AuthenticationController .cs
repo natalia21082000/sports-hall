@@ -1,113 +1,125 @@
-﻿using System.Dynamic;
-using System.Text;
+﻿using System.Security.Claims;
 using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
-using SportsHall.Models;
-using SportsHall.Models.Entities;
+using SportsHall.Common;
 using SportsHall.Models.Domains;
+using SportsHall.Models.Entities;
 using SportsHall.Services;
 using SportsHall.Services.Interfaces;
-using Microsoft.AspNetCore.Http;
+
+
 
 namespace SportsHall.Controllers
 {
     [ApiController]
-    [Route("api")]
+    [Route("api/auth")]
+    [Produces("application/json")]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public class AuthenticationController : ControllerBase
     {
-        private readonly IUsersService _usersService;
+        private readonly ILogger<AuthenticationController> _logger;
+        private readonly ITokenService _tokenService;
+        private readonly IUsersService _userService;
         private readonly IMapper _mapper;
-        private readonly ITokenService _token;
-        private readonly IWebHostEnvironment _env;
+        private readonly IWebHostEnvironment _environment;
 
-        public AuthenticationController(IUsersService usersService, IMapper mapper, ITokenService token, IWebHostEnvironment env)
+        public AuthenticationController(
+            ILogger<AuthenticationController> logger,
+            ITokenService tokenService,
+            IUsersService userService,
+            IMapper mapper,
+            IWebHostEnvironment environment)
         {
-            _usersService = usersService;
-            _mapper = mapper;
-            _token = token;
-            _env = env;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
+            _userService = userService ?? throw new ArgumentNullException(nameof(userService));
+            _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+            _environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> RegisterValentine([FromBody] UserRegisterDto userDto)
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserReadDto))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> RegisterUser([FromBody] UserRegisterDto userDto)
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return ValidationProblem();
             }
 
-            if (!await _usersService.IsEmailAddressUniqueAsync(userDto.EmailAddress))
+            if (!await _userService.IsEmailAddressUniqueAsync(userDto.EmailAddress))
             {
                 ModelState.AddModelError("EmailAddress", "Этот адрес электронной почты уже зарегистрирован.");
-                return BadRequest(ModelState);
+                return ValidationProblem();
             }
 
-            Users user = _mapper.Map<Users>(userDto);
+            var user = _mapper.Map<Users>(userDto);
 
             string salt = PasswordHelper.GenerateSalt();
             string hashedPassword = PasswordHelper.HashPassword(user.Password, salt);
-
             user.Password = hashedPassword;
             user.Salt = salt;
 
-            try
-            {
-                await _usersService.AddUserAsync(user);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Ошибка при сохранении пользователя: {ex}");
-                return StatusCode(500, "Произошла ошибка при регистрации пользователя.");
-            }
+            await _userService.AddUserAsync(user);
 
-            return Ok(new { Message = "Пользователь успешно зарегистрирован." });
+            var userReadDto = _mapper.Map<UserReadDto>(user);
+            return Ok(userReadDto);
         }
 
-
-
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] UserLoginDto userDto)
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(object))]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> Login([FromBody] UserLoginDto userLoginDto)
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return ValidationProblem();
             }
 
-            try
+            var user = await _userService.GetUserByLoginAsync(userLoginDto.Login, userLoginDto.Password);
+
+            if (user == null)
             {
-                var user = await _usersService.GetUserByLoginAsync(userDto.Login, userDto.Password);
+                _logger.LogWarning("Неудачная попытка входа: неверный логин или пароль.");
 
-                if (user == null)
+                return Unauthorized(new ProblemDetails
                 {
-                    return Unauthorized(new { Message = "Неверный логин или пароль." });
-                }
-
-                //  Создаем токен
-                var token = _token.CreateToken(user);
-
-                var cookieOptions = new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = _env.IsProduction() && !_env.IsDevelopment(),
-                    SameSite = SameSiteMode.Lax,
-                    Expires = DateTimeOffset.UtcNow.AddMinutes(30)
-                };
-
-                Response.Cookies.Append("authToken", token, cookieOptions);
-                return Ok(new { Username = user.Login, Message = "Вход выполнен успешно." });
+                    Title = "Неверные учетные данные",
+                    Detail = "Логин или пароль указаны неверно",
+                    Status = StatusCodes.Status401Unauthorized
+                });
             }
-            catch (Exception ex)
+
+            var claims = new List<Claim>
             {
-                Console.Error.WriteLine($"Ошибка при входе: {ex}");
-                if (_env.IsDevelopment())
-                {
-                    return StatusCode(500, $"Ошибка при входе: {ex.Message}\n{ex.StackTrace}"); // Подробности в dev
-                }
-                else
-                {
-                    return StatusCode(500, "Произошла ошибка при входе.");
-                }
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Login),
+                new Claim(ClaimTypes.Role, Roles.User)
+            };
+
+            if (!string.IsNullOrEmpty(user.Status))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, user.Status));
             }
+
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = _environment.IsProduction(),
+                SameSite = SameSiteMode.Lax,
+                Expires = DateTimeOffset.UtcNow.AddMinutes(30)
+            };
+            var token = _tokenService.GenerateToken(claims);
+
+            Response.Cookies.Append("authToken", token, cookieOptions);
+            var userReadDto = _mapper.Map<UserReadDto>(user);
+            return Ok(userReadDto);
         }
     }
 }

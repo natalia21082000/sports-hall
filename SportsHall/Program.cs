@@ -2,19 +2,26 @@ using SportsHall.Services.Interfaces;
 using SportsHall.Services;
 using dotenv.net;
 using SportsHall.Infrastructure.Settings;
+using SportsHall.Infrastructure.Middlewares;
+using FluentValidation.AspNetCore;
+using FluentValidation;
 
 DotEnv.Load();
 
-Console.WriteLine($"Загружены переменные из .env");
-
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Регистрация зависимостей
+builder.Services.AddControllers();
+
+// Добавляем FluentValidation
+builder.Services.AddFluentValidationAutoValidation(); // Автоматическая валидация на стороне сервера
+builder.Services.AddFluentValidationClientsideAdapters(); // Адаптеры для клиентской валидации (если нужна)
+
+// Регистрация валидаторов из сборки, где находится Program
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
 builder.Services.AddSingleton<IAppSettings, EnvAppSettings>();
 builder.Services.AddScoped<ADatabaseConnection, MssqlConnection>();
 builder.Services.AddScoped<IUsersService, UsersService>();
@@ -44,6 +51,8 @@ if (app.Environment.IsDevelopment())
 }
 
 // app.UseHttpsRedirection();
+
+app.UseExceptionHandling();
 
 app.UseAuthorization();
 
