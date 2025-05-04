@@ -14,19 +14,17 @@ namespace SportsHall.Controllers
             _db = db;
         }
 
-        [HttpGet("users")] // Изменили маршрут
+        [HttpGet("users")]
         public IActionResult GetUsers()
         {
             try
             {
-                // Используем EF Core для запроса к базе данных
-                var users = _db.Users.ToList(); // Получаем всех пользователей
+                var users = _db.Users.ToList();
 
-                return Ok(users); // Возвращаем список пользователей
+                return Ok(users);
             }
             catch (Exception ex)
             {
-                // Обрабатываем ошибки
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
